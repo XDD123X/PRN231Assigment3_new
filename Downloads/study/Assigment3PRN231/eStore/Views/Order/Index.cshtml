@@ -1,0 +1,44 @@
+﻿<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<h1>Sale Report</h1>
+<form id="reportForm">
+    <input type="date" name="sd" required />
+    <input type="date" name="ed" required />
+    <input type="submit" value="Create Report" />
+</form>
+
+<div id="resultsContainer"></div>
+
+<script>
+    $(document).ready(function () {
+        $("#reportForm").on("submit", function (event) {
+            event.preventDefault();
+            var sd = $("input[name='sd']").val();
+            var ed = $("input[name='ed']").val();
+            var apiUrl = "https://localhost:7064/api/OrderDetail?sd=" + encodeURIComponent(sd) + "&ed=" + encodeURIComponent(ed);
+
+            $.ajax({
+                url: apiUrl,
+                type: "GET",
+                success: function (response) {
+                    var resultHTML = "<table border='1'>";
+                    resultHTML += "<tr><th>Before</th><th>After</th></tr>";
+
+                    response.forEach(function (product) {
+                        resultHTML += "<tr>";
+                        resultHTML += "<td>" + product.beforeSale + "</td>"; 
+                        resultHTML += "<td>" + product.afterSale + "</td>";  
+                        resultHTML += "</tr>";
+                    });
+
+                    resultHTML += "</table>";
+                    $("#resultsContainer").html(resultHTML);
+                },
+                error: function (xhr, status, error) {
+                    alert("An error occurred: " + error);
+                }
+            });
+        });
+    });
+</script>
+

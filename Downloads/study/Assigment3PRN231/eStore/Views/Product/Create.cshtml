@@ -1,0 +1,84 @@
+﻿@model BusinessObject.DTO.ProductDTO
+
+<h1>Create Product</h1>
+
+<form id="createProductForm">
+    <div class="form-group">
+        <label asp-for="ProductName"></label>
+        <input asp-for="ProductName" id="ProductName" class="form-control" />
+        <span asp-validation-for="ProductName" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="UnitsInStock"></label>
+        <input asp-for="UnitsInStock" id="UnitsInStock" class="form-control" />
+        <span asp-validation-for="UnitsInStock" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="UnitPrice"></label>
+        <input asp-for="UnitPrice" id="UnitPrice" class="form-control" />
+        <span asp-validation-for="UnitPrice" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="Weight"></label>
+        <input asp-for="Weight" id="Weight" class="form-control" />
+        <span asp-validation-for="Weight" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="CategoryId"></label>
+        <select asp-for="CategoryId" id="CategoryId" class="form-control">
+            <option value="">Select Category</option>
+        </select>
+        <span asp-validation-for="CategoryId" class="text-danger"></span>
+    </div>
+    <button type="submit" id="CreateButton" class="btn btn-primary">Create</button>
+</form>
+
+<a asp-action="Index">Back to List</a>
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        LoadCategories();
+
+        function LoadCategories() {
+            $.ajax({
+                url: "https://localhost:7064/api/Category",
+                type: "get",
+                contentType: "application/json",
+                success: function (result) {
+                    $.each(result, function (index, category) {
+                        $("#CategoryId").append($("<option>").val(category.categoryId).text(category.categoryName));
+                    });
+                },
+                error: function (xhr) {
+                    console.log("Error fetching categories:", xhr);
+                }
+            });
+        }
+
+        $("#CreateButton").click(function (e) {
+            e.preventDefault();
+
+            var data = {
+                productName: $("#ProductName").val(),
+                unitsInStock: parseInt($("#UnitsInStock").val(), 10),
+                unitPrice: parseFloat($("#UnitPrice").val()),
+                weight: parseFloat($("#Weight").val()),
+                categoryId: parseInt($("#CategoryId").val(), 10)
+            };
+
+            $.ajax({
+                url: "https://localhost:7064/api/Product",
+                type: "post",
+                data: JSON.stringify(data),
+                contentType: "application/json",
+                success: function () {
+                    alert("Product created successfully!");
+                    window.location.href = "@Url.Action("Index", "Product")";
+                },
+                error: function (xhr) {
+                    console.log("Error creating product:", xhr);
+                }
+            });
+        });
+    });
+</script>

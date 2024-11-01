@@ -1,0 +1,244 @@
+﻿@model List<BusinessObject.Product>
+
+<h1>@ViewData["Title"]</h1>
+
+@if (Model == null || !Model.Any())
+{
+    <div class="alert alert-warning">
+        Không có danh sách sản phẩm.
+    </div>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Product ID</th>
+                <th>CategoryId</th>
+                <th>ProductName</th>
+                <th>UnitPrice</th>
+                <th>UnitsInStock</th>
+                <th>Weight</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var product in Model)
+            {
+                <tr>
+                    <td>@product.ProductId</td>
+                    <td>@product.CategoryId</td>
+                    <td>@product.ProductName</td>
+                    <td>@product.UnitPrice</td>
+                    <td>@product.UnitsInStock</td>
+                    <td>@product.Weight</td>
+                    <td>
+                        <a href="#" class="delete-link" data-id="@product.ProductId">Delete</a>
+                        <a href="#" class="update-link" data-id="@product.ProductId">Update</a>
+                        <button class="add-to-cart" data-id="@product.ProductId" data-name="@product.ProductName" data-price="@product.UnitPrice">Add to Cart</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<h1>Search Product</h1>
+
+<form id="productForm">
+    <input name="pName" type="text" placeholder="Product Name" /><br>
+    <input name="pUnitPrice" type="text" placeholder="Unit Price" /><br>
+    <button type="submit">Submit</button>
+</form>
+
+<div id="results"></div>
+
+<h1>Add Product</h1>
+
+<form id="addProductForm">
+    <input name="CategoryId" type="number" placeholder="Category ID" required /><br>
+    <input name="ProductName" type="text" placeholder="Product Name" required /><br>
+    <input name="UnitPrice" type="number" placeholder="Unit Price" required /><br>
+    <input name="UnitsInStock" type="number" placeholder="Units In Stock" required /><br>
+    <input name="Weight" type="text" placeholder="Weight" /><br>
+    <button type="submit">Thêm sản phẩm</button>
+</form>
+
+<div id="results"></div>
+
+<h1>Update Product</h1>
+
+<form id="updateProductForm">
+    <input name="updateProductId" type="hidden" />
+    <input name="updateCategoryId" type="number" placeholder="Category ID" required /><br>
+    <input name="updateProductName" type="text" placeholder="Product Name" required /><br>
+    <input name="updateUnitPrice" type="number" placeholder="Unit Price" required /><br>
+    <input name="updateUnitsInStock" type="number" placeholder="Units In Stock" required /><br>
+    <input name="updateWeight" type="text" placeholder="Weight" /><br>
+    <button type="submit">Cập nhật sản phẩm</button>
+</form>
+
+
+
+
+<div id="cart">
+    <h2>Your Cart</h2>
+    <table id="cartTable" class="table">
+        <thead>
+            <tr>
+                <th>Product Name</th>
+                <th>Unit Price</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="cartBody">
+        </tbody>
+    </table>
+</div>
+
+<script>
+    $(document).ready(function () {
+        $("#productForm").on("submit", function (event) {
+            event.preventDefault();
+            var productName = $("input[name='pName']").val();
+            var productUnitPrice = $("input[name='pUnitPrice']").val();
+            var apiUrl = "https://localhost:7064/api/ProductAPI/search?keyword=" + encodeURIComponent(productName) + "&unitPrice=" + (productUnitPrice ? encodeURIComponent(productUnitPrice) : "");
+
+            $.ajax({
+                url: apiUrl,
+                type: "GET",
+                success: function (response) {
+                    var resultsHtml = "<table border='1'><thead><tr>";
+                    resultsHtml += "<th>Product ID</th>";
+                    resultsHtml += "<th>Product Name</th>";
+                    resultsHtml += "<th>Unit Price</th>";
+                    resultsHtml += "<th>Units In Stock</th>";
+                    resultsHtml += "<th>Weight</th>";
+                    resultsHtml += "</tr></thead><tbody>";
+
+                    response.forEach(function (product) {
+                        resultsHtml += "<tr>";
+                        resultsHtml += "<td>" + product.productId + "</td>";
+                        resultsHtml += "<td>" + product.productName + "</td>";
+                        resultsHtml += "<td>" + product.unitPrice + "</td>";
+                        resultsHtml += "<td>" + product.unitsInStock + "</td>";
+                        resultsHtml += "<td>" + product.weight + "</td>";
+                        resultsHtml += "</tr>";
+                    });
+
+                    resultsHtml += "</tbody></table>";
+
+                    $("#results").html(resultsHtml);
+                },
+                error: function (xhr, textStatus, errorThrown) {
+                    alert("Failed to fetch data from API. Please check console for details.");
+                }
+            });
+        });
+
+        $(".delete-link").on("click", function (event) {
+            event.preventDefault();
+            var productId = $(this).data("id");
+            if (confirm("Bạn có chắc chắn muốn xóa sản phẩm này không?")) {
+                $.ajax({
+                    url: "https://localhost:7064/api/ProductAPI/" + productId,
+                    type: "DELETE",
+                    success: function () {
+                        alert("Xóa sản phẩm thành công.");
+                        location.reload();
+                    },
+                    error: function (xhr, textStatus, errorThrown) {
+                        alert("Không thể xóa sản phẩm. Hãy kiểm tra lại trên console.");
+                    }
+                });
+            }
+        });
+
+        $("#addProductForm").on("submit", function (event) {
+            event.preventDefault();
+            var productData = {
+                categoryId: parseInt($("input[name='CategoryId']").val()),
+                productName: $("input[name='ProductName']").val(),
+                unitPrice: parseFloat($("input[name='UnitPrice']").val()),
+                unitsInStock: parseInt($("input[name='UnitsInStock']").val()),
+                weight: $("input[name='Weight']").val()
+            };
+
+            $.ajax({
+                url: "https://localhost:7064/api/ProductAPI",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(productData),
+                success: function (response) {
+                    alert("Thêm sản phẩm thành công: " + response);
+                    location.reload();
+                },
+                error: function (xhr, textStatus, errorThrown) {
+                    alert("Không thể thêm sản phẩm. Hãy kiểm tra lại trên console.");
+                }
+            });
+        });
+
+        $(".update-link").on("click", function (event) {
+            event.preventDefault();
+            var productId = $(this).data("id");
+
+            $.ajax({
+                url: "https://localhost:7064/api/ProductAPI/" + productId,
+                type: "GET",
+                success: function (product) {
+                    $("input[name='updateProductId']").val(product.productId);
+                    $("input[name='updateCategoryId']").val(product.categoryId);
+                    $("input[name='updateProductName']").val(product.productName);
+                    $("input[name='updateUnitPrice']").val(product.unitPrice);
+                    $("input[name='updateUnitsInStock']").val(product.unitsInStock);
+                    $("input[name='updateWeight']").val(product.weight);
+                    $("#updateProductForm").show();
+                },
+                error: function (xhr, textStatus, errorThrown) {
+                    alert("Không thể lấy thông tin sản phẩm. Hãy kiểm tra lại trên console.");
+                }
+            });
+        });
+
+        $("#updateProductForm").on("submit", function (event) {
+            event.preventDefault();
+            var productData = {
+                productId: parseInt($("input[name='updateProductId']").val()),
+                categoryId: parseInt($("input[name='updateCategoryId']").val()),
+                productName: $("input[name='updateProductName']").val(),
+                unitPrice: parseFloat($("input[name='updateUnitPrice']").val()),
+                unitsInStock: parseInt($("input[name='updateUnitsInStock']").val()),
+                weight: $("input[name='updateWeight']").val()
+            };
+
+            $.ajax({
+                url: "https://localhost:7064/api/ProductAPI/" + productData.productId,
+                type: "PUT",
+                contentType: "application/json",
+                data: JSON.stringify(productData),
+                success: function (response) {
+                    alert("Cập nhật sản phẩm thành công: " + response);
+                    location.reload();
+                },
+                error: function (xhr, textStatus, errorThrown) {
+                    alert("Không thể cập nhật sản phẩm. Hãy kiểm tra lại trên console.");
+                }
+            });
+        });
+
+        $(".add-to-cart").on("click", function () {
+            var productId = $(this).data("id");
+            var productName = $(this).data("name");
+            var productPrice = $(this).data("price");
+            var cartBody = $("#cartBody");
+            var rowHtml = "<tr><td>" + productName + "</td><td>" + productPrice + "</td><td><button class='remove-from-cart' data-id='" + productId + "'>Remove</button></td></tr>";
+            cartBody.append(rowHtml);
+        });
+
+        $(document).on("click", ".remove-from-cart", function () {
+            $(this).closest("tr").remove();
+        });
+    });
+</script>
+<a asp-controller="Order" asp-action="Index" class="btn btn-primary">Order and Sale</a>

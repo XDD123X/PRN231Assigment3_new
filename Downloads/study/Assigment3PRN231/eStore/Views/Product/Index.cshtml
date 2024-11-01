@@ -1,0 +1,270 @@
+﻿@{
+    var isAdmin = User.IsInRole("Admin");
+}
+
+<p>
+    @if (isAdmin)
+    {
+        <a asp-action="Create">Create New</a>
+    }
+</p>
+<label for="categoryDropdown">Category:</label>
+<select id="categoryDropdown">
+    <option value="">All Categories</option>
+</select>
+
+<label for="priceInput">Price:</label>
+<input type="number" id="priceInput" placeholder="Enter price" />
+<label for="ProductName">Name:</label>
+<input type="text" id="search" placeholder="Search..." />
+
+<table class="table" id="productTable">
+    <thead>
+        <tr>
+            <th>ProductId</th>
+            <th>ProductName</th>
+            <th>Category</th>
+            <th>Weight</th>
+            <th>UnitPrice</th>
+            <th>UnitsInStock</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    </tbody>
+</table>
+
+<h3>Cart</h3>
+<table class="table" id="cartTable" style="display:none;">
+    <thead>
+        <tr>
+            <th>ProductName</th>
+            <th>Units</th>
+            <th>Price</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    </tbody>
+</table>
+
+
+<button class="btn btn-success" id="placeOrder" style="display:none;">Place Order</button>
+<script>
+    $(document).ready(function () {
+    var editUrl = '@Url.Action("Edit", "Product")';
+    var isAdmin = '@isAdmin';
+    var cart = [];
+
+    ShowAllProducts();
+    LoadCategories();
+
+    function ShowAllProducts() {
+        $("table tbody").html("");
+        $.ajax({
+            url: "https://localhost:7064/api/Product",
+            type: "get",
+            contentType: "application/json",
+            success: function (result) {
+                renderProducts(result);
+            },
+            error: function () {
+                console.log("Error fetching products");
+            }
+        });
+    }
+
+    function LoadCategories() {
+        $.ajax({
+            url: "https://localhost:7064/api/Category",
+            type: "get",
+            contentType: "application/json",
+            success: function (result) {
+                $.each(result, function (index, category) {
+                    $("#categoryDropdown").append($("<option>").val(category.categoryId).text(category.categoryName));
+                });
+            },
+            error: function () {
+                console.log("Error fetching categories");
+            }
+        });
+    }
+
+    $("#search, #priceInput").on("input", function () {
+        var searchTerm = $("#search").val();
+        var selectedCategory = $("#categoryDropdown").val();
+        var unitPrice = $("#priceInput").val();
+        ShowAllProductsBySearch(searchTerm, selectedCategory, unitPrice);
+    });
+
+    $("#categoryDropdown").on("change", function () {
+        var searchTerm = $("#search").val();
+        var selectedCategory = $(this).val();
+        var unitPrice = $("#priceInput").val();
+        ShowAllProductsBySearch(searchTerm, selectedCategory, unitPrice);
+    });
+
+    function ShowAllProductsBySearch(keyword, cid, unitPrice) {
+        $("table tbody").html("");
+        $.ajax({
+            url: `https://localhost:7064/api/Product/search?keyword=${keyword}&cid=${cid || ""}&unitPrice=${unitPrice || ""}`,
+            type: "get",
+            contentType: "application/json",
+            success: function (result) {
+                renderProducts(result);
+            },
+            error: function () {
+                console.log("Error fetching products");
+            }
+        });
+    }
+
+    function renderProducts(products) {
+        $("tbody").empty();
+        $.each(products, function (index, value) {
+            var appendElement = $("<tr>");
+            appendElement.append($("<td>").html(value.productId));
+            appendElement.append($("<td>").html(value.productName));
+            appendElement.append($("<td>").html(value.categoryName));
+            appendElement.append($("<td>").html(value.weight));
+            appendElement.append($("<td>").html(value.unitPrice));
+            appendElement.append($("<td>").html(value.unitsInStock));
+
+            var actions = $("<td>");
+            if (isAdmin) {
+                actions.append("<a href='" + editUrl + "/" + value.productId + "'>Edit</a> ");
+                actions.append("<span class='delete' style='cursor:pointer; color:red;'>Delete</span> ");
+            }
+            var quantityInput = $("<input type='number' class='quantityInput' min='1' max='" + value.unitsInStock + "' value='1' style='width: 60px;' />");
+            actions.append(quantityInput);
+            actions.append("<button class='btn btn-primary addToCart' data-id='" + value.productId + "' data-price='" + value.unitPrice + "'>Add to Cart</button>");
+            appendElement.append(actions);
+            $("tbody").append(appendElement);
+        });
+    }
+
+    $("table").on("click", ".addToCart", function () {
+        var productId = $(this).data("id");
+        var quantity = parseInt($(this).siblings(".quantityInput").val());
+        var unitPrice = parseFloat($(this).data("price"));
+
+        if (quantity <= 0) {
+            alert("Please enter a valid quantity!");
+            return;
+        }
+
+        var availableStock = parseInt($(this).siblings(".quantityInput").attr("max"));
+
+        if (cart.some(item => item.productId === productId)) {
+            var cartItem = cart.find(item => item.productId === productId);
+            if (cartItem.quantity + quantity <= availableStock) {
+                cartItem.quantity += quantity;
+            } else {
+                alert("Cannot exceed available stock!");
+                return;
+            }
+        } else {
+            cart.push({ productId: productId, quantity: quantity, unitPrice: unitPrice, discount: 0 });
+        }
+
+        renderCart();
+        $("#placeOrder").toggle(cart.length > 0);
+        $("#cartTable").show();
+    });
+
+    function renderCart() {
+        $("#cartTable tbody").empty();
+        $.each(cart, function (index, item) {
+            $.ajax({
+                url: `https://localhost:7064/api/Product/${item.productId}`,
+                type: "get",
+                contentType: "application/json",
+                success: function (product) {
+                    var appendElement = $("<tr>");
+                    appendElement.append($("<td>").html(product.productName));
+                    appendElement.append($("<td>").html(item.quantity));
+                    var totalPrice = item.unitPrice * item.quantity;
+                    appendElement.append($("<td>").html(totalPrice.toFixed(2)));
+
+                    var actions = $("<td>");
+                    actions.append("<input type='number' class='quantityToRemove' min='1' max='" + item.quantity + "' value='1' style='width: 60px;' />");
+                    actions.append("<button class='btn btn-danger removeFromCart' data-id='" + item.productId + "'>Remove</button>");
+                    appendElement.append(actions);
+                    $("#cartTable tbody").append(appendElement);
+                },
+                error: function () {
+                    console.log("Error fetching product details");
+                }
+            });
+        });
+    }
+
+    $("#cartTable").on("click", ".removeFromCart", function () {
+        var productId = $(this).data("id");
+        var quantityToRemove = parseInt($(this).siblings(".quantityToRemove").val());
+
+        var cartItem = cart.find(item => item.productId === productId);
+        if (cartItem) {
+            if (cartItem.quantity > quantityToRemove) {
+                cartItem.quantity -= quantityToRemove;
+            } else {
+                cart = cart.filter(item => item.productId !== productId);
+            }
+        }
+
+        renderCart();
+        $("#placeOrder").toggle(cart.length > 0);
+        if (cart.length === 0) {
+            $("#cartTable").hide();
+        }
+    });
+
+    $("#placeOrder").click(function () {
+        var orderDetails = cart.map(item => ({
+            productId: item.productId,
+            unitPrice: item.unitPrice,
+            quantity: item.quantity,
+            discount: item.discount
+        }));
+
+        var orderData = {
+            orderDetails: orderDetails,
+            orderDate: new Date().toISOString(),
+            freight: 0
+        };
+
+        $.ajax({
+            url: "https://localhost:7064/api/Order",
+            type: "post",
+            contentType: "application/json",
+            data: JSON.stringify(orderData),
+            success: function () {
+                alert("Order placed successfully!");
+                cart = [];
+                renderCart();
+                $("#placeOrder").hide();
+                $("#cartTable").hide();
+            },
+            error: function () {
+                alert("Error placing order");
+            }
+        });
+    });
+
+    $("table").on("click", ".delete", function () {
+        var productId = $(this).parents("tr").find("td:nth-child(1)").text();
+        $.ajax({
+            url: "https://localhost:7064/api/Product/" + productId,
+            type: "delete",
+            contentType: "application/json",
+            success: function () {
+                ShowAllProducts();
+            },
+            error: function () {
+                console.log("Error deleting product");
+            }
+        });
+    });
+});
+
+</script>
